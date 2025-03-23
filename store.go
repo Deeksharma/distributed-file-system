@@ -8,10 +8,11 @@ import (
 	"io"
 	"log"
 	"os"
+	"path/filepath"
 	"strings"
 )
 
-func CASPathTransformFunc(key string) PathKey {
+func CASPathTransformFunc(root string, key string) PathKey {
 	hash := sha1.Sum([]byte(key)) // [20]byte => convert this to slice then just use hash[:]
 	hashStr := hex.EncodeToString(hash[:])
 
@@ -26,28 +27,38 @@ func CASPathTransformFunc(key string) PathKey {
 	}
 
 	return PathKey{
-		PathName: strings.Join(paths, "/"),
+		PathName: filepath.Join(root, strings.Join(paths, "/")),
 		FileName: hashStr,
 	}
 }
 
-type ParthTransformFunc func(string) PathKey
+type ParthTransformFunc func(string, string) PathKey
 type StoreOpts struct {
+	// Root is the folder name of the root, containing all the folders/files of the system
+	Root              string
 	PathTransformFunc ParthTransformFunc
 }
 
-var DefaultPathTransformFunction = func(key string) PathKey {
+var DefaultPathTransformFunction = func(root string, key string) PathKey {
 	return PathKey{
-		PathName: key,
-		FileName: key,
+		PathName: filepath.Join(root, key),
+		FileName: filepath.Join(root, key),
 	}
 }
+
+const defaultRootFolderName = "deeksha-distributed-store"
 
 type Store struct {
 	StoreOpts
 }
 
 func NewStore(opts StoreOpts) *Store {
+	if opts.PathTransformFunc == nil {
+		opts.PathTransformFunc = DefaultPathTransformFunction
+	}
+	if len(opts.Root) == 0 {
+		opts.Root = defaultRootFolderName
+	}
 	return &Store{
 		StoreOpts: opts,
 	}
@@ -62,6 +73,36 @@ func (p PathKey) FullPath() string {
 	return fmt.Sprintf("%s/%s", p.PathName, p.FileName)
 }
 
+func (s *Store) Has(key string) bool {
+	pathKey := s.PathTransformFunc(s.Root, key)
+
+	_, err := os.Stat(pathKey.FullPath())
+	if err != nil {
+		return false
+	}
+
+	return true
+}
+
+func (s *Store) Delete(key string) error {
+	pathKey := s.PathTransformFunc(s.Root, key)
+
+	defer func() {
+		log.Printf("deleted [%s] from disk", pathKey.FileName)
+	}()
+	absPath, _ := filepath.Abs(pathKey.PathName)
+	// remove all is not deleting all the directories
+	if err := os.RemoveAll(pathKey.FullPath()); err != nil {
+		return err
+	}
+
+	err := os.RemoveAll(absPath)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
 func (s *Store) Read(key string) (io.Reader, error) {
 	f, err := s.readStream(key)
 	defer f.Close()
@@ -74,7 +115,7 @@ func (s *Store) Read(key string) (io.Reader, error) {
 }
 
 func (s *Store) readStream(key string) (io.ReadCloser, error) {
-	pathKey := s.PathTransformFunc(key)
+	pathKey := s.PathTransformFunc(s.Root, key)
 	//fullFilePathName := pathKey.FileName
 
 	f, err := os.Open(pathKey.FullPath())
@@ -87,7 +128,7 @@ func (s *Store) readStream(key string) (io.ReadCloser, error) {
 
 // content addressable storage where we can store anything and transformation on keys
 func (s *Store) writeStream(key string, r io.Reader) error {
-	pathKey := s.PathTransformFunc(key)
+	pathKey := s.PathTransformFunc(s.Root, key)
 
 	if err := os.MkdirAll(pathKey.PathName, os.ModePerm); err != nil {
 		return err

@@ -9,7 +9,7 @@ import (
 
 func TestPathTransformFunc(t *testing.T) {
 	key := "momsbestpicture"
-	pathKey := CASPathTransformFunc(key)
+	pathKey := CASPathTransformFunc(defaultRootFolderName, key)
 	//fmt.Println(pathName)
 	expectedOriginal := "6804429f74181a63c50c3d81d733a12f14a353ff"
 	expectedPathName := "68044/29f74/181a6/3c50c/3d81d/733a1/2f14a/353ff"
@@ -21,7 +21,22 @@ func TestPathTransformFunc(t *testing.T) {
 	}
 }
 
-func TestNewStore(t *testing.T) {
+func TestStore_Delete(t *testing.T) {
+	opts := StoreOpts{PathTransformFunc: CASPathTransformFunc}
+	s := NewStore(opts)
+	key := "momsbestpicture"
+
+	data := []byte("some jpeg value")
+	if err := s.writeStream(key, bytes.NewReader(data)); err != nil {
+		t.Error(err)
+	}
+
+	if err := s.Delete(key); err != nil {
+		t.Error(err)
+	}
+}
+
+func TestStore(t *testing.T) {
 	opts := StoreOpts{PathTransformFunc: CASPathTransformFunc}
 	s := NewStore(opts)
 
@@ -30,6 +45,10 @@ func TestNewStore(t *testing.T) {
 	data := []byte("some jpeg value")
 	if err := s.writeStream(key, bytes.NewReader(data)); err != nil {
 		t.Error(err)
+	}
+
+	if ok := s.Has(key); !ok {
+		t.Errorf("key should exist %s", key)
 	}
 
 	r, err := s.Read(key)
@@ -41,5 +60,4 @@ func TestNewStore(t *testing.T) {
 		t.Errorf("data should be %s, got %s", data, b)
 	}
 	fmt.Println(string(b))
-
 }
