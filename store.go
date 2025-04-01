@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"crypto/sha1"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -77,11 +78,11 @@ func (s *Store) Has(key string) bool {
 	pathKey := s.PathTransformFunc(s.Root, key)
 
 	_, err := os.Stat(pathKey.FullPath())
-	if err != nil {
-		return false
-	}
+	return !errors.Is(err, os.ErrNotExist)
+}
 
-	return true
+func (s *Store) Clear() error {
+	return os.RemoveAll(s.Root)
 }
 
 func (s *Store) Delete(key string) error {
@@ -101,6 +102,10 @@ func (s *Store) Delete(key string) error {
 		return err
 	}
 	return nil
+}
+
+func (s *Store) Write(key string, r io.Reader) error {
+	return s.writeStream(key, r)
 }
 
 func (s *Store) Read(key string) (io.Reader, error) {
