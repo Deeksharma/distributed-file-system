@@ -2,7 +2,6 @@ package p2p
 
 import (
 	"encoding/gob"
-	"fmt"
 	"io"
 )
 
@@ -21,13 +20,12 @@ type DefaultDecoder struct {
 }
 
 func (dec *DefaultDecoder) Decode(reader io.Reader, msg *RPC) error {
-	buf := make([]byte, 2000)
+	buf := make([]byte, 1024) // this is very small for large files so we will stream data
 	n, err := reader.Read(buf)
+
 	if err != nil {
 		return err
 	}
-	//buf = buf[:n]
-	fmt.Println(string(buf[:n]))
 
 	msg.Payload = buf[:n]
 	return nil

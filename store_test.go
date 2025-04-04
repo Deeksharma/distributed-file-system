@@ -10,7 +10,7 @@ import (
 func TestPathTransformFunc(t *testing.T) {
 	key := "momsbestpicture"
 	pathKey := CASPathTransformFunc(defaultRootFolderName, key)
-	//fmt.Println(pathName)
+	//log.Println(pathName)
 	expectedOriginal := "6804429f74181a63c50c3d81d733a12f14a353ff"
 	expectedPathName := "deeksha-distributed-store/68044/29f74/181a6/3c50c/3d81d/733a1/2f14a/353ff"
 	if pathKey.PathName != expectedPathName {
@@ -62,7 +62,7 @@ func TestStore(t *testing.T) {
 		if string(b) != string(data) {
 			t.Errorf("data should be %s, got %s", data, b)
 		}
-		fmt.Println(string(b))
+		log.Println(string(b))
 
 		if err := s.Delete(key); err != nil {
 			t.Error(err)

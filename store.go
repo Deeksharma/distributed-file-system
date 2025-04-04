@@ -104,7 +104,7 @@ func (s *Store) Delete(key string) error {
 	return nil
 }
 
-func (s *Store) Write(key string, r io.Reader) error {
+func (s *Store) Write(key string, r io.Reader) (int64, error) {
 	return s.writeStream(key, r)
 }
 
@@ -121,7 +121,6 @@ func (s *Store) Read(key string) (io.Reader, error) {
 
 func (s *Store) readStream(key string) (io.ReadCloser, error) {
 	pathKey := s.PathTransformFunc(s.Root, key)
-	//fullFilePathName := pathKey.FileName
 
 	f, err := os.Open(pathKey.FullPath())
 	if err != nil {
@@ -132,31 +131,29 @@ func (s *Store) readStream(key string) (io.ReadCloser, error) {
 }
 
 // content addressable storage where we can store anything and transformation on keys
-func (s *Store) writeStream(key string, r io.Reader) error {
+func (s *Store) writeStream(key string, r io.Reader) (int64, error) {
 	pathKey := s.PathTransformFunc(s.Root, key)
 
 	if err := os.MkdirAll(pathKey.PathName, os.ModePerm); err != nil {
-		return err
+		return 0, err
 	}
 
-	// the contents that we are putting cannot be the filename
-	//buf := new(bytes.Buffer)
-	//io.Copy(buf, r)
-	//
-	//filenameBytes := md5.Sum(buf.Bytes())
 	fullFilePathName := pathKey.FullPath()
 
 	f, err := os.Create(fullFilePathName)
 	if err != nil {
-		return err
+		return 0, err
 	}
 	defer f.Close()
 
-	n, err := io.Copy(f, r)
+	n, err := io.Copy(f, r) // the write stream is blocking here ? why ? in test it is working fine because we are using bytes but when you read from a connection the connection wont return an EOF
 	if err != nil {
-		return err
+		return 0, err
 	}
 
+	// so the copy keeps on waiting, Limit reader solves this issue
+	//panic("here!!!!!!!")
+
 	log.Printf("written (%d) bytes to the disk: %s", n, fullFilePathName)
-	return nil
+	return n, nil
 }
